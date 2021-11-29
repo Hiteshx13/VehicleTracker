@@ -7,6 +7,8 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.appcompat.app.AlertDialog
 import com.scope.vehicletracker.R
+import java.text.SimpleDateFormat
+import java.util.*
 
 
 object AppUtils {
@@ -59,6 +61,16 @@ object AppUtils {
             subStrUrl = strUrl.substring(0, indexEnd + 5)
         }
         return subStrUrl.toString()
+    }
+
+
+    fun Date.toString(format: String, locale: Locale = Locale.getDefault()): String {
+        val formatter = SimpleDateFormat(format, locale)
+        return formatter.format(this)
+    }
+
+    fun getCurrentDateTime(): Date {
+        return Calendar.getInstance().time
     }
 
 }

@@ -37,4 +37,7 @@ class OwnerViewModel(val ownerRepository: OwnerRepository) : ViewModel() {
     }
 
     fun getAllOwners() = ownerRepository.getOwnersData()
+    fun deleteAllRecords() = viewModelScope.launch {
+        ownerRepository.deleteAllRecords()
+    }
 }

@@ -1,15 +1,17 @@
 package com.scope.vehicletracker.ui.owner
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.AsyncListDiffer
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.scope.vehicletracker.R
-import com.squareup.picasso.Picasso
 import com.scope.vehicletracker.network.response.owner.OwnerResponse
 import com.scope.vehicletracker.util.AppUtils
+import com.squareup.picasso.Picasso
 import jp.wasabeef.picasso.transformations.CropCircleTransformation
 import kotlinx.android.synthetic.main.row_user_list.view.*
 
@@ -66,8 +68,10 @@ class OwnerListAdapter :
 
                 /** remove extra string from image url**/
                 val formattedImageUrl = AppUtils.getFormattedImageUrl(owner?.foto.toString())
-
+                Log.d("USER_IMAGE", "$formattedImageUrl")
                 if (formattedImageUrl.isNotEmpty()) {
+
+//                    Glide.with(this).load(formattedImageUrl).into(ivProfile)
                     Picasso.get().load(formattedImageUrl)
                         .placeholder(R.drawable.ic_user)
                         .resize(300, 300)
