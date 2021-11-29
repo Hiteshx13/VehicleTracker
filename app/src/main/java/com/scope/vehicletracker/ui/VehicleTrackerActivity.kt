@@ -21,8 +21,6 @@ class VehicleTrackerActivity : AppCompatActivity() {
         viewModel =
             ViewModelProvider(this, viewModelProviderFactory)[OwnerViewModel::class.java]
 
-//        val intent = Intent(this, LocationService::class.java)
-//        ContextCompat.startForegroundService(this, intent)
 
     }
 }

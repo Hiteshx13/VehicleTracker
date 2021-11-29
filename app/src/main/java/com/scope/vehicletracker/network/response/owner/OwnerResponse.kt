@@ -19,7 +19,7 @@ data class OwnerResponse(
     data class Data(
         @PrimaryKey(autoGenerate = true)
         var id: Int?,
-
+        var currentDate:String?,
         val owner: Owner?,
         val userid: Int?,
 

@@ -1,6 +1,7 @@
 package com.scope.vehicletracker.db
 
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -13,10 +14,13 @@ interface OwnerDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(owner: OwnerResponse.Data): Long
 
-    @Query("SELECT * FROM  ownerdata")
-    fun getAllOwners(): LiveData<List<OwnerResponse.Data>>
+    @Query("SELECT * FROM  OwnerData")
+    fun getOwnerDataFromDB(): LiveData<List<OwnerResponse.Data>>
 
-    @Query("DELETE FROM  ownerdata")
+//    @Query("SELECT * FROM  OwnerData LIMIT 1")
+//    suspend fun getFirstOwners(): List<OwnerResponse.Data>
+
+    @Query("DELETE FROM  OwnerData")
     suspend fun deleteAllRecords()
 
 }

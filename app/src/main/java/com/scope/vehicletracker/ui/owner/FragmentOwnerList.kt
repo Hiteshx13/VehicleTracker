@@ -11,6 +11,9 @@ import com.scope.vehicletracker.R
 import com.scope.vehicletracker.network.Resource
 import com.scope.vehicletracker.network.response.owner.OwnerResponse
 import com.scope.vehicletracker.ui.VehicleTrackerActivity
+import com.scope.vehicletracker.util.AppUtils.getDeviceCurrentDate
+import com.scope.vehicletracker.util.AppUtils.getSavedDatefromPref
+import com.scope.vehicletracker.util.AppUtils.saveCurrentDateToPref
 import kotlinx.android.synthetic.main.fragment_owner_list.*
 
 class FragmentOwnerList : Fragment(R.layout.fragment_owner_list) {
@@ -21,9 +24,22 @@ class FragmentOwnerList : Fragment(R.layout.fragment_owner_list) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         viewModel = (activity as VehicleTrackerActivity).viewModel
-        setupRecyclerView()
-        setObserver()
 
+        setupRecyclerView()
+        setAdapterClickListener()
+        setObserver()
+        chechAndLoadOwnerData()
+    }
+
+    private fun setupRecyclerView() {
+        ownerAdapter = OwnerListAdapter()
+        rvOwners.apply {
+            adapter = ownerAdapter
+            layoutManager = LinearLayoutManager(activity)
+        }
+    }
+
+    private fun setAdapterClickListener(){
         ownerAdapter.setOnItemClickListener {
 
             val bundle = Bundle().apply {
@@ -36,29 +52,23 @@ class FragmentOwnerList : Fragment(R.layout.fragment_owner_list) {
         }
     }
 
-    private fun setupRecyclerView() {
-        ownerAdapter = OwnerListAdapter()
-        rvOwners.apply {
-            adapter = ownerAdapter
-            layoutManager = LinearLayoutManager(activity)
-        }
-    }
-
 
     private fun setObserver() {
-        viewModel.getAllOwners().observe(viewLifecycleOwner){ownerList->
-            ownerAdapter.differ.submitList(ownerList)
-        }
-        viewModel.ownerResponse.observe(viewLifecycleOwner, Observer { response ->
+        viewModel.getOwnerDataFromDB().observe(viewLifecycleOwner, {response->
+            ownerAdapter.differ.submitList(response)
+            hideProgressBar()
+        })
+
+        viewModel.ownerResponseAPI.observe(viewLifecycleOwner, Observer { response ->
             when (response) {
                 is Resource.Success -> {
                     hideProgressBar()
                     viewModel.deleteAllRecords()
                     response.data?.let { ownerResponse ->
-                        val data = ArrayList<OwnerResponse.Data>()
+
+                        saveCurrentDateToPref(requireContext())
                         ownerResponse.data?.forEach { response ->
                             if (response?.owner != null) { // Removing empty data from response
-                                data.add(response)
                                 viewModel.saveOwnerData(response)
                             }
                         }
@@ -75,9 +85,22 @@ class FragmentOwnerList : Fragment(R.layout.fragment_owner_list) {
                 }
 
             }
+//            viewModel.getOwnerDataFromDB()
         })
+    }
 
-
+    private fun chechAndLoadOwnerData(){
+        val savedDate = getSavedDatefromPref(requireContext())
+        if (savedDate.isEmpty()) {
+            viewModel.getOwnerDataFromAPI()
+        } else {
+            val devicCurrentDate = getDeviceCurrentDate()
+            if (savedDate.lowercase() == devicCurrentDate.lowercase()) {
+                viewModel.getOwnerDataFromDB()
+            } else {
+                viewModel.getOwnerDataFromAPI()
+            }
+        }
     }
 
     private fun hideProgressBar() {

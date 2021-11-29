@@ -7,7 +7,11 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.appcompat.app.AlertDialog
 import com.scope.vehicletracker.R
+import com.scope.vehicletracker.util.Constants.Companion.PREF_NAME
+import com.scope.vehicletracker.util.Constants.Companion.SAVED_DATE
 import java.text.SimpleDateFormat
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.*
 
 
@@ -64,13 +68,24 @@ object AppUtils {
     }
 
 
-    fun Date.toString(format: String, locale: Locale = Locale.getDefault()): String {
-        val formatter = SimpleDateFormat(format, locale)
-        return formatter.format(this)
+    fun getDeviceCurrentDate(): String {
+        val current = LocalDateTime.now()
+        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+        return current.format(formatter)
     }
 
-    fun getCurrentDateTime(): Date {
-        return Calendar.getInstance().time
+    fun saveCurrentDateToPref(context: Context){
+        val sharedPref=context.getSharedPreferences(PREF_NAME,Context.MODE_PRIVATE)
+        var editor=sharedPref.edit()
+
+        editor.putString(SAVED_DATE,getDeviceCurrentDate())
+        editor.apply()
+    }
+
+    fun getSavedDatefromPref(context: Context):String{
+        val sharedPref=context.getSharedPreferences(PREF_NAME,Context.MODE_PRIVATE)
+      return sharedPref.getString(SAVED_DATE,"")?:""
+
     }
 
 }

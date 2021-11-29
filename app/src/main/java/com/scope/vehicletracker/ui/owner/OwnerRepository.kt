@@ -8,8 +8,9 @@ import com.scope.vehicletracker.network.response.owner.OwnerResponse
 class OwnerRepository(
     val db:OwnerDatabase
 ) {
-    suspend fun getOwnerList(op: String) = RetrofitInstance.api.getOwnerList(op)
+    suspend fun getOwnerDataFromAPI(op: String) = RetrofitInstance.api.getOwnerList(op)
     suspend fun upsert(ownerData: OwnerResponse.Data)= db.getOwnerDao().upsert(ownerData)
-    fun getOwnersData()=db.getOwnerDao().getAllOwners()
+    fun getOwnerDataFromDB()=db.getOwnerDao().getOwnerDataFromDB()
+//    suspend fun getFirstOwners()=db.getOwnerDao().getFirstOwners()
     suspend fun deleteAllRecords()=db.getOwnerDao().deleteAllRecords()
 }
