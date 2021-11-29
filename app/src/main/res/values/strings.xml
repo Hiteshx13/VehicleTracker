@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">VehicleTracker</string>
+    <string name="map_api_key">AIzaSyAvp9SJ6mZIcyxxhT2MrvhLjUrHjMGscAA</string>
+    <string name="cancel">Cancel</string>
+    <string name="settings">Settings</string>
+    <string name="message_location_permission">Application requires location permission to show current location and navigate to nearest vehicle. Please allow it from application settings.</string>
+
 </resources>

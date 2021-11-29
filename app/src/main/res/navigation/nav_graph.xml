@@ -7,7 +7,7 @@
 
     <fragment
         android:id="@+id/fragmentUserList"
-        android:name="com.veh.demo.owners.FragmentOwnerList"
+        android:name="com.scope.vehicletracker.ui.owner.FragmentOwnerList"
         android:label="fragment_user_list"
         tools:layout="@layout/fragment_owner_list" >
         <action
@@ -17,11 +17,11 @@
     </fragment>
     <fragment
         android:id="@+id/fragmentMapUserVehicle"
-        android:name="com.veh.demo.vehicle.FragmentMapUserVehicle"
+        android:name="com.scope.vehicletracker.ui.vehicle.FragmentMapUserVehicle"
         android:label="fragment_map_user_vehicle"
         tools:layout="@layout/fragment_map_user_vehicle" >
         <argument
-            android:name="user_id"
-            app:argType="string" />
+            android:name="owner_data"
+            app:argType="com.scope.vehicletracker.network.response.owner.OwnerResponse$Data" />
     </fragment>
 </navigation>
