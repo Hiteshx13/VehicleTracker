@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/fragmentUserList">
+
+    <fragment
+        android:id="@+id/fragmentUserList"
+        android:name="com.veh.demo.owners.FragmentOwnerList"
+        android:label="fragment_user_list"
+        tools:layout="@layout/fragment_owner_list" >
+        <action
+            android:id="@+id/action_fragmentUserList_to_fragmentMapUserVehicle"
+            app:destination="@id/fragmentMapUserVehicle"
+            app:popUpTo="@id/fragmentMapUserVehicle" />
+    </fragment>
+    <fragment
+        android:id="@+id/fragmentMapUserVehicle"
+        android:name="com.veh.demo.vehicle.FragmentMapUserVehicle"
+        android:label="fragment_map_user_vehicle"
+        tools:layout="@layout/fragment_map_user_vehicle" >
+        <argument
+            android:name="user_id"
+            app:argType="string" />
+    </fragment>
+</navigation>
