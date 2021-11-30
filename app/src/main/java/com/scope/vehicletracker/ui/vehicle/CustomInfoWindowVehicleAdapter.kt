@@ -45,7 +45,7 @@ internal class CustomInfoWindowVehicleAdapter(
         val color = Color.parseColor(model.color)
         binding.viewVehicleColor.setBackgroundColor(color)
 
-        Log.d("VEHICLE_IMAGE", model.foto ?: "")
+//        Log.d("VEHICLE_IMAGE", model.foto ?: "")
         /** removing extra string from image url and loading image**/
         val formattedImageUrl = AppUtils.getFormattedImageUrl(model.foto.toString())
         Picasso.get().load(formattedImageUrl)

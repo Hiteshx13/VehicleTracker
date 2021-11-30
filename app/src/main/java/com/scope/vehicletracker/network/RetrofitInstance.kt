@@ -1,11 +1,12 @@
 package com.scope.vehicletracker.network
 
+import com.google.gson.GsonBuilder
 import com.scope.vehicletracker.util.Constants.Companion.BASE_URL
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import com.google.gson.GsonBuilder
+import retrofit2.converter.scalars.ScalarsConverterFactory
 
 
 class RetrofitInstance {
@@ -25,23 +26,15 @@ class RetrofitInstance {
             Retrofit.Builder()
                 .baseUrl(BASE_URL)
                 .addConverterFactory(GsonConverterFactory.create(gson))
+                .addConverterFactory(ScalarsConverterFactory.create())
                 .client(client)
                 .build()
 
         }
-//        val retrofit=Retrofit
-//            .Builder()
-//            .baseUrl(BASE_URL)
-//            .addConverterFactory(GsonConverterFactory.create())
-//            .build()
 
         val api by lazy {
             retrofit.create(VehicleAPI::class.java)
         }
     }
 
-
-//    suspend fun getOwnerList():List<OwnerResponse>{
-//        return networkInterface.getOwnerList()
-//    }
 }

@@ -10,12 +10,16 @@ import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.navigation.fragment.navArgs
+import com.akexorcist.googledirection.DirectionCallback
+import com.akexorcist.googledirection.GoogleDirection
+import com.akexorcist.googledirection.model.Direction
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -38,16 +42,13 @@ import com.scope.vehicletracker.util.SettingsDialogClickListener
 import kotlinx.android.synthetic.main.fragment_map_user_vehicle.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.akexorcist.googledirection.DirectionCallback
-
-import com.akexorcist.googledirection.GoogleDirection
-import com.akexorcist.googledirection.model.Direction
 
 
 class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
-    OnMapReadyCallback,GoogleMap.OnMarkerClickListener {
+    OnMapReadyCallback, GoogleMap.OnMarkerClickListener {
 
     private val TAG = "FragmentMapUserVehicle"
     private lateinit var viewModel: OwnerViewModel
@@ -59,8 +60,9 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
     private lateinit var locationCallback: LocationCallback
     private lateinit var currentDeviceLocation: Location
     private var oldVehicleList: List<OwnerResponse.Data.Vehicle>? = null
-    private var isUpdating = false
+    private var isUpdatingVehicleLocation = false
     private var markerClickID = ""
+    private var requestPermissionLauncher : ActivityResultLauncher<Array<String>>?= null
     private lateinit var mFusedLocationClient: FusedLocationProviderClient
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -69,20 +71,43 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
         oldVehicleList = ownerData.vehicles
         viewModel = (activity as VehicleTrackerActivity).viewModel
 
+        initPermissionLauncher()
         setupGoogleMap()
         setupDeviceLocationCallback()
-        requestLocationPermission()
         setObserver()
         callApiEveryMinute()
+        getDirectionToNearestVehicle()
 
-        if(isLocationAllowed){
-            getDirectionToNearestVehicle()
-        }
+
     }
 
+    @SuppressLint("MissingPermission")
+    fun initPermissionLauncher() {
+        requestPermissionLauncher =
+            registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+                when {
+                    permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
+                        isLocationAllowed = true
+                        googleMap?.isMyLocationEnabled = true
+                        startLocationUpdates()
+                    }
+                    permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
+                        isLocationAllowed = true
+                        googleMap?.isMyLocationEnabled = true
+                        startLocationUpdates()
+                    }
+                    else -> {
+                        isLocationAllowed = false
+                        showSettingsDialog()
+                    }
+                }
+            }
+    }
+
+    private lateinit var job: Job
 
     private fun callApiEveryMinute() {
-        CoroutineScope(Main).launch {
+        job = CoroutineScope(Main).launch {
             viewModel.getVehicleDataFromAPI(ownerData.userid.toString())
             Log.d("callApiEveryMinute", "call")
             delay(VEHICLE_API_DELAY)
@@ -90,15 +115,15 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
         }
     }
 
+    override fun onDetach() {
+        super.onDetach()
+        job.cancel()
+        isUpdatingVehicleLocation = false
+    }
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
-        isUpdating = false
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (isLocationAllowed) startLocationUpdates()
+        isUpdatingVehicleLocation = false
     }
 
     override fun onPause() {
@@ -114,20 +139,25 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
                     hideProgressBar()
                     response.data?.let { ownerResponse ->
                         ownerResponse.data?.forEach { newVehicleResponse ->
-                            oldVehicleList?.forEach { oldVehicleData ->
-                                if (oldVehicleData.vehicleid?.equals(newVehicleResponse?.vehicleid) == true) { // Removing empty data from response
-                                    oldVehicleData.lat = newVehicleResponse?.lat
-                                    oldVehicleData.lon = newVehicleResponse?.lon
-                                    showOwnerVehicleOnMap(oldVehicleData)
+                            /** checking for null location**/
+                            if (newVehicleResponse?.lat != null
+                                && newVehicleResponse.lon != null
+                            ) {
+                                oldVehicleList?.forEach { oldVehicleData ->
+                                    if (oldVehicleData.vehicleid?.equals(newVehicleResponse.vehicleid) == true
+                                    ) { // Removing empty data from response
+                                        oldVehicleData.lat = newVehicleResponse.lat
+                                        oldVehicleData.lon = newVehicleResponse.lon
+                                        showOwnerVehicleOnMap(oldVehicleData)
+                                    }
                                 }
                             }
-
                         }
                         updateVehicleDataInDB()
-                        if(!isUpdating){
-                        zoomOnFirstMarker()
+                        if (!isUpdatingVehicleLocation) {
+                            zoomOnFirstMarker()
                         }
-                        isUpdating = true
+                        isUpdatingVehicleLocation = true
 
 
                     }
@@ -135,7 +165,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
                 is Resource.Error -> {
                     hideProgressBar()
                     response.message?.let { message ->
-                        Toast.makeText(requireContext(),message,Toast.LENGTH_LONG).show()
+                        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
                         Log.d(TAG, "Error occured: $message ")
                     }
                 }
@@ -149,7 +179,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
     /**
      * get route between current location to nearest vehicle
      */
-    private fun getDirectionToNearestVehicle(){
+    private fun getDirectionToNearestVehicle() {
         val serverKey = "AIzaSyAvp9SJ6mZIcyxxhT2MrvhLjUrHjMGscAA"
         val origin = LatLng(37.7849569, -122.4068855)
         val destination = LatLng(37.7814432, -122.4460177)
@@ -159,12 +189,12 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
             .execute(object : DirectionCallback {
 
                 override fun onDirectionSuccess(direction: Direction?) {
-                    Log.d("","")
+                    Log.d("", "")
                 }
 
                 override fun onDirectionFailure(t: Throwable) {
                     // Do something here
-                    Log.d("","")
+                    Log.d("", "")
                 }
             })
     }
@@ -178,35 +208,41 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
     }
 
     private fun showOwnerVehicleOnMap(vehicle: OwnerResponse.Data.Vehicle) {
+        val marker = mapMarkers[vehicle.vehicleid.toString()]
+        if (marker != null) {
 
-        if (isUpdating) {
-            val marker = mapMarkers[vehicle.vehicleid.toString()]
+        }
 
-            val oldModel: OwnerResponse.Data.Vehicle = marker?.tag as OwnerResponse.Data.Vehicle
-            oldModel.lat = vehicle.lat
-            oldModel.lon = vehicle.lon
-            marker.tag = oldModel
+        if (isUpdatingVehicleLocation) {
 
-            /** updating current open infoWindow data **/
-            if (markerClickID.isNotEmpty()) {
-                val markerClicked = mapMarkers[markerClickID]
-                if (markerClicked?.isInfoWindowShown == true) {
-                    markerClicked.showInfoWindow()
+            if (marker != null) {
+                val oldModel: OwnerResponse.Data.Vehicle = marker.tag as OwnerResponse.Data.Vehicle
+                oldModel.lat = vehicle.lat
+                oldModel.lon = vehicle.lon
+                marker.tag = oldModel
+
+
+                /** updating current open infoWindow data **/
+                if (markerClickID.isNotEmpty()) {
+                    val markerClicked = mapMarkers[markerClickID]
+                    if (markerClicked?.isInfoWindowShown == true) {
+                        markerClicked.showInfoWindow()
+                    }
                 }
-            }
 
-            animateMarker(
-                marker!!, LatLng(
-                    vehicle.lat!!,
-                    vehicle.lon!!
-                ), LatLngInterpolator.Spherical()
-            )
+                animateMarker(
+                    marker, LatLng(
+                        vehicle.lat!!,
+                        vehicle.lon!!
+                    ), LatLngInterpolator.Spherical()
+                )
+            }
         } else {
             val marker: Marker?
             googleMap?.setInfoWindowAdapter(
                 CustomInfoWindowVehicleAdapter(
                     layoutInflater,
-                    isUpdating
+                    isUpdatingVehicleLocation
                 )
             )
             googleMap?.setOnMarkerClickListener(this)
@@ -232,8 +268,8 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
         }
     }
 
-    fun updateVehicleDataInDB(){
-        ownerData.vehicles=oldVehicleList
+    fun updateVehicleDataInDB() {
+        ownerData.vehicles = oldVehicleList
         viewModel.updateOwnerVehicleData(ownerData)
     }
 
@@ -294,34 +330,13 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
      */
     @SuppressLint("MissingPermission")
     private fun requestLocationPermission() {
-        val requestPermisisionLauncher =
-            registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-                when {
-                    permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
-                        isLocationAllowed = true
-                        googleMap?.isMyLocationEnabled = true
-                        startLocationUpdates()
-                    }
-                    permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
-                        isLocationAllowed = true
-                        googleMap?.isMyLocationEnabled = true
-                        startLocationUpdates()
-                    }
-                    else -> {
-                        isLocationAllowed = false
-                        showSettingsDialog()
-                    }
-                }
-            }
-
         when {
             ContextCompat.checkSelfPermission(
                 activity!!,
                 Manifest.permission.ACCESS_FINE_LOCATION
-
-            )
-                    == PackageManager.PERMISSION_GRANTED -> {
+            ) == PackageManager.PERMISSION_GRANTED -> {
                 googleMap?.isMyLocationEnabled = true
+                isLocationAllowed = true
                 startLocationUpdates()
             }
             ActivityCompat.shouldShowRequestPermissionRationale(
@@ -329,9 +344,11 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) -> {
                 // Message
+                showSettingsDialog()
+//                Toast.makeText(requireContext(),"Enable Location",Toast.LENGTH_LONG).show()
             }
             else -> {
-                requestPermisisionLauncher.launch(
+                requestPermissionLauncher?.launch(
                     arrayOf(
                         Manifest.permission.ACCESS_FINE_LOCATION,
                         Manifest.permission.ACCESS_COARSE_LOCATION
@@ -361,8 +378,10 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
         mapFragment?.getMapAsync(this)
     }
 
+
     override fun onMapReady(map: GoogleMap) {
         googleMap = map
+        requestLocationPermission()
     }
 
     /** function for Map Marker click listener**/
