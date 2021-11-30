@@ -40,17 +40,15 @@ internal class CustomInfoWindowVehicleAdapter(
                 .replace(",", "\n")
 
         binding.tvName.text = "${model.make} ${model.model}"
-
         val color = Color.parseColor(model.color)
         binding.viewVehicleColor.setBackgroundColor(color)
 
-//        Log.d("VEHICLE_IMAGE", model.foto ?: "")
         /** removing extra string from image url and loading image**/
         val formattedImageUrl = AppUtils.getFormattedImageUrl(model.foto.toString())
         Picasso.get().load(formattedImageUrl)
-            .placeholder(R.drawable.ic_user)
+            .placeholder(R.drawable.ic_car)
             .into(
-                binding.ivProfile,
+                binding.ivVehicle,
                 object : MarkerCallback(marker) {
 
                 },

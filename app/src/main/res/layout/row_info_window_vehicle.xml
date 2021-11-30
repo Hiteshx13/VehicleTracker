@@ -14,10 +14,11 @@
         android:paddingBottom="@dimen/_10sdp">
 
         <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/ivProfile"
+            android:id="@+id/ivVehicle"
             android:layout_width="@dimen/_40sdp"
             android:layout_height="@dimen/_40sdp"
-            android:src="@drawable/ic_user" />
+            android:scaleType="fitXY"
+            android:src="@drawable/ic_car" />
 
         <LinearLayout
             android:id="@+id/llMain"
