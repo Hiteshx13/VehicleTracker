@@ -12,11 +12,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Observer
 import androidx.navigation.fragment.navArgs
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.Marker
 import com.scope.vehicletracker.R
 import com.scope.vehicletracker.network.response.owner.OwnerResponse
 import com.scope.vehicletracker.ui.VehicleTrackerActivity
@@ -41,10 +43,13 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
         super.onViewCreated(view, savedInstanceState)
         ownerData = args.ownerData
         viewModel = (activity as VehicleTrackerActivity).viewModel
-        setupLocationCallback()
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
         setupMap()
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
+        setupLocationCallback()
         requestLocationPermission()
+
+        setObserver()
+        viewModel.getVehicleDataFromAPI(ownerData.userid.toString())
 
     }
 
@@ -57,6 +62,31 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
         super.onPause()
         stopLocationUpdates()
     }
+
+    fun setObserver() {
+        viewModel.vehicleResponseAPI.observe(viewLifecycleOwner, Observer { response ->
+//            ownerData.vehicles=response
+            val responseList=response.data
+        })
+    }
+
+    private fun showOwnerVehicleOnMap() {
+        ownerData.vehicles?.forEach { vehicle ->
+
+            val marker: Marker?
+
+//            val markerOpt = MarkerOptions().position(
+//                LatLng(
+//                    vehicle.lat.toDouble(),
+//                    model.lan.toDouble()
+//                )
+//            ).snippet(model.profile)
+//
+//            marker?.tag = vehicle
+
+        }
+    }
+
 
     private fun setupLocationCallback() {
         locationCallback = object : LocationCallback() {

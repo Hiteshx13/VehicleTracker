@@ -16,8 +16,8 @@ class VehicleTrackerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val ownerRepository=OwnerRepository(OwnerDatabase(this))
-         val viewModelProviderFactory = OwnerViewModelProviderFactory(ownerRepository)
+        val ownerRepository = OwnerRepository(OwnerDatabase(this))
+        val viewModelProviderFactory = OwnerViewModelProviderFactory(ownerRepository)
         viewModel =
             ViewModelProvider(this, viewModelProviderFactory)[OwnerViewModel::class.java]
 

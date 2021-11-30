@@ -2,10 +2,7 @@ package com.scope.vehicletracker.db
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
+import androidx.room.*
 import com.scope.vehicletracker.network.response.owner.OwnerResponse
 
 @Dao
@@ -16,6 +13,9 @@ interface OwnerDao {
 
     @Query("SELECT * FROM  OwnerData")
     fun getOwnerDataFromDB(): LiveData<List<OwnerResponse.Data>>
+
+    @Update
+    fun updateVehicleData(owner: OwnerResponse.Data)
 
 //    @Query("SELECT * FROM  OwnerData LIMIT 1")
 //    suspend fun getFirstOwners(): List<OwnerResponse.Data>

@@ -54,7 +54,6 @@ class OwnerListAdapter :
         return differ.currentList.size
     }
 
-
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val ownerData: OwnerResponse.Data? = differ.currentList[position]
         holder.itemView.apply {
@@ -66,12 +65,10 @@ class OwnerListAdapter :
                     onItemClickListener?.let { it(ownerData!!) }
                 }
 
-                /** remove extra string from image url**/
+                /** removing extra string from image url and loading image**/
                 val formattedImageUrl = AppUtils.getFormattedImageUrl(owner?.foto.toString())
-                Log.d("USER_IMAGE", "$formattedImageUrl")
+                Log.d("USER_IMAGE", formattedImageUrl)
                 if (formattedImageUrl.isNotEmpty()) {
-
-//                    Glide.with(this).load(formattedImageUrl).into(ivProfile)
                     Picasso.get().load(formattedImageUrl)
                         .placeholder(R.drawable.ic_user)
                         .resize(300, 300)

@@ -39,9 +39,12 @@ class FragmentOwnerList : Fragment(R.layout.fragment_owner_list) {
         }
     }
 
+    /**
+     * Adapter click listener to navigate
+     * on map screen for vehicles shown on map
+     */
     private fun setAdapterClickListener(){
         ownerAdapter.setOnItemClickListener {
-
             val bundle = Bundle().apply {
                 putSerializable("owner_data", it)
             }
@@ -53,12 +56,16 @@ class FragmentOwnerList : Fragment(R.layout.fragment_owner_list) {
     }
 
 
+    /**
+     * observers for API data and local storage data
+     */
     private fun setObserver() {
         viewModel.getOwnerDataFromDB().observe(viewLifecycleOwner, {response->
             ownerAdapter.differ.submitList(response)
             hideProgressBar()
         })
 
+        /** observer for api data*/
         viewModel.ownerResponseAPI.observe(viewLifecycleOwner, Observer { response ->
             when (response) {
                 is Resource.Success -> {
@@ -83,12 +90,13 @@ class FragmentOwnerList : Fragment(R.layout.fragment_owner_list) {
                 is Resource.Loading -> {
                     showProgressBar()
                 }
-
             }
-//            viewModel.getOwnerDataFromDB()
         })
     }
-
+    /**
+     * check if owner list fetched from api for today,
+     * If data already fetched form server, than use it from
+     * local storage*/
     private fun chechAndLoadOwnerData(){
         val savedDate = getSavedDatefromPref(requireContext())
         if (savedDate.isEmpty()) {

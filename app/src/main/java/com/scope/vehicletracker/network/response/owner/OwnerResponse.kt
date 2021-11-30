@@ -22,8 +22,7 @@ data class OwnerResponse(
         var currentDate:String?,
         val owner: Owner?,
         val userid: Int?,
-
-        val vehicles: MutableList<Vehicle>?
+        var vehicles: MutableList<Vehicle>?
     ):Serializable  {
         @Keep
         @TypeConverters(Converters::class)
@@ -46,7 +45,9 @@ data class OwnerResponse(
             val model: String?,
             val vehicleid: Int?,
             val vin: String?,
-            val year: String?
+            val year: String?,
+            val lat: Double?,
+            val lon: Double?
         ):Serializable
     }
 }
