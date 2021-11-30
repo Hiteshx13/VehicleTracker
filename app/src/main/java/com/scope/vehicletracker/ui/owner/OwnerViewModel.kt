@@ -34,10 +34,16 @@ class OwnerViewModel(private val ownerRepository: OwnerRepository) : ViewModel()
     }
 
     /** handle vehicle data response from api*/
+//<html><head><title>Server overloaded</title></head><body><h1>Server overloaded</h1></body></html>
+
     private fun handleVehicleResponse(response: Response<VehicleResponse>): Resource<VehicleResponse> {
         if (response.isSuccessful) {
             response.body()?.let { resultResponse ->
-                return Resource.Success(resultResponse)
+                return if(response.body().toString().contains("<html>",true)){
+                    Resource.Error(response.message())
+                }else{
+                    Resource.Success(resultResponse as VehicleResponse )
+                }
             }
         }
         return Resource.Error(response.message())

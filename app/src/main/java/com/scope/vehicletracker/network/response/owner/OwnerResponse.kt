@@ -22,7 +22,7 @@ data class OwnerResponse(
         var currentDate:String?,
         val owner: Owner?,
         val userid: Int?,
-        var vehicles: MutableList<Vehicle>?
+        var vehicles: List<Vehicle>?
     ):Serializable  {
         @Keep
         @TypeConverters(Converters::class)

@@ -2,12 +2,14 @@ package com.scope.vehicletracker.ui.vehicle
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
 import android.os.Bundle
 import android.os.Looper
 import android.util.Log
 import android.view.View
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -19,6 +21,7 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
@@ -28,25 +31,41 @@ import com.scope.vehicletracker.network.response.owner.OwnerResponse
 import com.scope.vehicletracker.ui.VehicleTrackerActivity
 import com.scope.vehicletracker.ui.owner.OwnerViewModel
 import com.scope.vehicletracker.util.AppUtils
+import com.scope.vehicletracker.util.AppUtils.animateMarker
+import com.scope.vehicletracker.util.Constants.Companion.VEHICLE_API_DELAY
+import com.scope.vehicletracker.util.LatLngInterpolator
 import com.scope.vehicletracker.util.SettingsDialogClickListener
 import kotlinx.android.synthetic.main.fragment_map_user_vehicle.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import com.akexorcist.googledirection.DirectionCallback
+
+import com.akexorcist.googledirection.GoogleDirection
+import com.akexorcist.googledirection.model.Direction
+
 
 class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
     OnMapReadyCallback {
 
+    private val TAG = "FragmentMapUserVehicle"
     private lateinit var viewModel: OwnerViewModel
     private var isLocationAllowed = false
     private val args: FragmentMapUserVehicleArgs by navArgs()
     private lateinit var ownerData: OwnerResponse.Data
     private var googleMap: GoogleMap? = null
+    private var mapMarkers = HashMap<String?, Marker?>()
     private lateinit var locationCallback: LocationCallback
-    private lateinit var correntDeviceLocation: Location
-    private val TAG = "FragmentMapUserVehicle"
+    private lateinit var currentDeviceLocation: Location
+    private var oldVehicleList: List<OwnerResponse.Data.Vehicle>? = null
+    private var isUpdating = false
     private lateinit var mFusedLocationClient: FusedLocationProviderClient
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         ownerData = args.ownerData
+        oldVehicleList = ownerData.vehicles
         viewModel = (activity as VehicleTrackerActivity).viewModel
         setupMap()
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
@@ -54,8 +73,27 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
         requestLocationPermission()
 
         setObserver()
-        viewModel.getVehicleDataFromAPI(ownerData.userid.toString())
+        callApiEveryMinute()
 
+        if(isLocationAllowed){
+            getDirectionToNearestVehicle()
+        }
+    }
+
+
+    private fun callApiEveryMinute() {
+        CoroutineScope(Main).launch {
+            viewModel.getVehicleDataFromAPI(ownerData.userid.toString())
+            Log.d("callApiEveryMinute", "call")
+            delay(VEHICLE_API_DELAY)
+            callApiEveryMinute()
+        }
+    }
+
+
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        isUpdating = false
     }
 
     override fun onResume() {
@@ -68,25 +106,26 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
         stopLocationUpdates()
     }
 
-    fun setObserver() {
+    private fun setObserver() {
         viewModel.vehicleResponseAPI.observe(viewLifecycleOwner, Observer { response ->
 
             when (response) {
                 is Resource.Success -> {
                     hideProgressBar()
                     response.data?.let { ownerResponse ->
-                        val oldVehicleList = ownerData.vehicles
-
                         ownerResponse.data?.forEach { newVehicleResponse ->
-                            oldVehicleList?.forEach { oldVehcileData ->
-                                if (oldVehcileData.vehicleid?.equals(newVehicleResponse?.vehicleid) == true) { // Removing empty data from response
-                                    oldVehcileData.lat = newVehicleResponse?.lat
-                                    oldVehcileData.lon = newVehicleResponse?.lon
-                                    showOwnerVehicleOnMap(oldVehcileData, false)
+                            oldVehicleList?.forEach { oldVehicleData ->
+                                if (oldVehicleData.vehicleid?.equals(newVehicleResponse?.vehicleid) == true) { // Removing empty data from response
+                                    oldVehicleData.lat = newVehicleResponse?.lat
+                                    oldVehicleData.lon = newVehicleResponse?.lon
+                                    showOwnerVehicleOnMap(oldVehicleData)
                                 }
                             }
 
                         }
+                        zoomOnFirstMarker()
+                        updateVehicleDataInDB()
+                        isUpdating = true
 
 
                     }
@@ -94,6 +133,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
                 is Resource.Error -> {
                     hideProgressBar()
                     response.message?.let { message ->
+                        Toast.makeText(requireContext(),message,Toast.LENGTH_LONG).show()
                         Log.d(TAG, "Error occured: $message ")
                     }
                 }
@@ -104,6 +144,29 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
         })
     }
 
+    /**
+     * get route between current location to nearest vehicle
+     */
+    private fun getDirectionToNearestVehicle(){
+        val serverKey = "AIzaSyAvp9SJ6mZIcyxxhT2MrvhLjUrHjMGscAA"
+        val origin = LatLng(37.7849569, -122.4068855)
+        val destination = LatLng(37.7814432, -122.4460177)
+        GoogleDirection.withServerKey(serverKey)
+            .from(origin)
+            .to(destination)
+            .execute(object : DirectionCallback {
+
+                override fun onDirectionSuccess(direction: Direction?) {
+                    Log.d("","")
+                }
+
+                override fun onDirectionFailure(t: Throwable) {
+                    // Do something here
+                    Log.d("","")
+                }
+            })
+    }
+
     private fun hideProgressBar() {
         progressBarMap.visibility = View.INVISIBLE
     }
@@ -112,31 +175,73 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
         progressBarMap.visibility = View.VISIBLE
     }
 
-    private fun showOwnerVehicleOnMap(vehicle: OwnerResponse.Data.Vehicle, isUpdating: Boolean) {
+    private fun showOwnerVehicleOnMap(vehicle: OwnerResponse.Data.Vehicle) {
 
-        val marker: Marker?
-        googleMap?.setInfoWindowAdapter(CustomInfoWindowVehicleAdapter(layoutInflater, isUpdating))
-
-        val markerOpt = MarkerOptions().position(
-            LatLng(
-                vehicle.lat!!,
-                vehicle.lon!!
+        if (isUpdating) {
+            val marker = mapMarkers[vehicle.vehicleid.toString()]
+            animateMarker(
+                marker!!, LatLng(
+                    vehicle.lat!!,
+                    vehicle.lon!!
+                ), LatLngInterpolator.Spherical()
             )
-        ).snippet(vehicle.model)
-        marker = googleMap?.addMarker(markerOpt)
-        marker?.tag = vehicle
-        googleMap?.moveCamera(
-            CameraUpdateFactory.newLatLng(
+        } else {
+            val marker: Marker?
+            googleMap?.setInfoWindowAdapter(
+                CustomInfoWindowVehicleAdapter(
+                    layoutInflater,
+                    isUpdating
+                )
+            )
+
+            val markerOpt = MarkerOptions().position(
                 LatLng(
                     vehicle.lat!!,
                     vehicle.lon!!
                 )
+            ).snippet(vehicle.model)
+            marker = googleMap?.addMarker(markerOpt)
+
+            marker?.tag = vehicle
+            googleMap?.moveCamera(
+                CameraUpdateFactory.newLatLng(
+                    LatLng(
+                        vehicle.lat!!,
+                        vehicle.lon!!
+                    )
+                )
             )
-        )
-
-
+            mapMarkers[vehicle.vehicleid.toString()] = marker
+//            markerList.add()
+        }
     }
 
+    fun updateVehicleDataInDB(){
+        ownerData.vehicles=oldVehicleList
+        viewModel.updateOwnerVehicleData(ownerData)
+    }
+
+    /** zoom on first marker*/
+    private fun zoomOnFirstMarker() {
+//        Log.d("old",""+Pld)
+        if (!oldVehicleList.isNullOrEmpty()) {
+            val firstVehicle = oldVehicleList!![0]
+
+            if (firstVehicle.lat != null && firstVehicle.lon != null) {
+
+
+                val zoomLatLan = LatLng(
+                    firstVehicle.lat!!,
+                    firstVehicle.lon!!
+                )
+
+                val cameraPosition =
+                    CameraPosition.Builder().target(zoomLatLan).zoom(16.0f).build()
+                val cameraUpdate = CameraUpdateFactory.newCameraPosition(cameraPosition)
+                googleMap?.moveCamera(cameraUpdate)
+            }
+        }
+    }
 
     private fun setupLocationCallback() {
         locationCallback = object : LocationCallback() {
@@ -144,7 +249,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
                 locationResult ?: return
                 for (location in locationResult.locations) {
                     Log.d("Location Update", "${location.latitude} ${location.longitude}")
-                    correntDeviceLocation = location
+                    currentDeviceLocation = location
                 }
             }
         }

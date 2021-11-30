@@ -5,9 +5,17 @@ import android.content.Context
 import android.content.Intent
 import android.location.Address
 import android.location.Geocoder
+import android.net.ConnectivityManager
+import android.net.NetworkInfo
 import android.net.Uri
+import android.os.Handler
+import android.os.SystemClock
 import android.provider.Settings
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.Interpolator
 import androidx.appcompat.app.AlertDialog
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.Marker
 import com.scope.vehicletracker.R
 import com.scope.vehicletracker.util.Constants.Companion.PREF_NAME
 import com.scope.vehicletracker.util.Constants.Companion.SAVED_DATE
@@ -112,5 +120,45 @@ object AppUtils {
             .getAddressLine(0)
     }
 
+
+    /** Animate marker between two locations**/
+    fun animateMarker(
+        marker: Marker,
+        finalPosition: LatLng,
+        latLngInterpolator: LatLngInterpolator
+    ) {
+        val startPosition = marker.position
+        val handler = Handler()
+        val start = SystemClock.uptimeMillis()
+        val interpolator: Interpolator = AccelerateDecelerateInterpolator()
+        val durationInMs = 2000f
+        handler.post(object : Runnable {
+            var elapsed: Long = 0
+            var t = 0f
+            var v = 0f
+            override fun run() {
+                // Calculate progress using interpolator
+                elapsed = SystemClock.uptimeMillis() - start
+                t = elapsed / durationInMs
+                v = interpolator.getInterpolation(t)
+                marker.position = latLngInterpolator.interpolate(v, startPosition, finalPosition)
+                // Repeat till progress is complete.
+                if (t < 1) {
+                    // Post again 16ms later.
+                    handler.postDelayed(this, 16)
+                }
+            }
+        })
+    }
+
+    /** check internet connectivity**/
+    fun isNetworkConnected(context: Context): Boolean {
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val activeNetwork: NetworkInfo? = connectivityManager.activeNetworkInfo
+        val isConnected: Boolean = activeNetwork?.isConnectedOrConnecting == true
+
+        return isConnected
+    }
 
 }

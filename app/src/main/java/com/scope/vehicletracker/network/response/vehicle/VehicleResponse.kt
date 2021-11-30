@@ -8,7 +8,8 @@ import com.scope.vehicletracker.db.Converters
 @Keep
 @TypeConverters(Converters::class)
 data class VehicleResponse(
-    val `data`: List<Data?>?
+    val `data`: List<Data?>?,
+    val message: String?
 ) {
     @Keep
     @TypeConverters(Converters::class)
