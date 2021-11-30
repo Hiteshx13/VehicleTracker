@@ -14,6 +14,7 @@ interface OwnerDao {
     @Query("SELECT * FROM  OwnerData")
     fun getOwnerDataFromDB(): LiveData<List<OwnerResponse.Data>>
 
+
     @Update
     fun updateVehicleData(owner: OwnerResponse.Data)
 

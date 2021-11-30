@@ -46,8 +46,8 @@ data class OwnerResponse(
             val vehicleid: Int?,
             val vin: String?,
             val year: String?,
-            val lat: Double?,
-            val lon: Double?
+            var lat: Double?,
+            var lon: Double?
         ):Serializable
     }
 }

@@ -3,6 +3,8 @@ package com.scope.vehicletracker.util
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.location.Address
+import android.location.Geocoder
 import android.net.Uri
 import android.provider.Settings
 import androidx.appcompat.app.AlertDialog
@@ -68,12 +70,14 @@ object AppUtils {
     }
 
 
+    /** get current date**/
     fun getDeviceCurrentDate(): String {
         val current = LocalDateTime.now()
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
         return current.format(formatter)
     }
 
+    /** save current date in shared pref**/
     fun saveCurrentDateToPref(context: Context){
         val sharedPref=context.getSharedPreferences(PREF_NAME,Context.MODE_PRIVATE)
         var editor=sharedPref.edit()
@@ -82,10 +86,31 @@ object AppUtils {
         editor.apply()
     }
 
+    /** get saved date from shared pref**/
     fun getSavedDatefromPref(context: Context):String{
         val sharedPref=context.getSharedPreferences(PREF_NAME,Context.MODE_PRIVATE)
       return sharedPref.getString(SAVED_DATE,"")?:""
 
     }
+
+
+    /** get address from LatLan**/
+    fun getAddressFromLatLan(
+        context: Context,
+        latitude: Double,
+        longitude: Double
+    ): String {
+        val addresses: List<Address>
+        val geocoder = Geocoder(context, Locale.getDefault())
+        addresses = geocoder.getFromLocation(
+            latitude ,
+            longitude ,
+            1
+        )
+
+        return addresses[0]
+            .getAddressLine(0)
+    }
+
 
 }

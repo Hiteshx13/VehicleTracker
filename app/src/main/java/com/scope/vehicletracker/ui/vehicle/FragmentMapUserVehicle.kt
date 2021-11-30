@@ -15,16 +15,21 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.navigation.fragment.navArgs
 import com.google.android.gms.location.*
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
+import com.google.android.gms.maps.model.MarkerOptions
 import com.scope.vehicletracker.R
+import com.scope.vehicletracker.network.Resource
 import com.scope.vehicletracker.network.response.owner.OwnerResponse
 import com.scope.vehicletracker.ui.VehicleTrackerActivity
 import com.scope.vehicletracker.ui.owner.OwnerViewModel
 import com.scope.vehicletracker.util.AppUtils
 import com.scope.vehicletracker.util.SettingsDialogClickListener
+import kotlinx.android.synthetic.main.fragment_map_user_vehicle.*
 
 class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
     OnMapReadyCallback {
@@ -36,7 +41,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
     private var googleMap: GoogleMap? = null
     private lateinit var locationCallback: LocationCallback
     private lateinit var correntDeviceLocation: Location
-
+    private val TAG = "FragmentMapUserVehicle"
     private lateinit var mFusedLocationClient: FusedLocationProviderClient
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -65,26 +70,71 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
 
     fun setObserver() {
         viewModel.vehicleResponseAPI.observe(viewLifecycleOwner, Observer { response ->
-//            ownerData.vehicles=response
-            val responseList=response.data
+
+            when (response) {
+                is Resource.Success -> {
+                    hideProgressBar()
+                    response.data?.let { ownerResponse ->
+                        val oldVehicleList = ownerData.vehicles
+
+                        ownerResponse.data?.forEach { newVehicleResponse ->
+                            oldVehicleList?.forEach { oldVehcileData ->
+                                if (oldVehcileData.vehicleid?.equals(newVehicleResponse?.vehicleid) == true) { // Removing empty data from response
+                                    oldVehcileData.lat = newVehicleResponse?.lat
+                                    oldVehcileData.lon = newVehicleResponse?.lon
+                                    showOwnerVehicleOnMap(oldVehcileData, false)
+                                }
+                            }
+
+                        }
+
+
+                    }
+                }
+                is Resource.Error -> {
+                    hideProgressBar()
+                    response.message?.let { message ->
+                        Log.d(TAG, "Error occured: $message ")
+                    }
+                }
+                is Resource.Loading -> {
+                    showProgressBar()
+                }
+            }
         })
     }
 
-    private fun showOwnerVehicleOnMap() {
-        ownerData.vehicles?.forEach { vehicle ->
+    private fun hideProgressBar() {
+        progressBarMap.visibility = View.INVISIBLE
+    }
 
-            val marker: Marker?
+    private fun showProgressBar() {
+        progressBarMap.visibility = View.VISIBLE
+    }
 
-//            val markerOpt = MarkerOptions().position(
-//                LatLng(
-//                    vehicle.lat.toDouble(),
-//                    model.lan.toDouble()
-//                )
-//            ).snippet(model.profile)
-//
-//            marker?.tag = vehicle
+    private fun showOwnerVehicleOnMap(vehicle: OwnerResponse.Data.Vehicle, isUpdating: Boolean) {
 
-        }
+        val marker: Marker?
+        googleMap?.setInfoWindowAdapter(CustomInfoWindowVehicleAdapter(layoutInflater, isUpdating))
+
+        val markerOpt = MarkerOptions().position(
+            LatLng(
+                vehicle.lat!!,
+                vehicle.lon!!
+            )
+        ).snippet(vehicle.model)
+        marker = googleMap?.addMarker(markerOpt)
+        marker?.tag = vehicle
+        googleMap?.moveCamera(
+            CameraUpdateFactory.newLatLng(
+                LatLng(
+                    vehicle.lat!!,
+                    vehicle.lon!!
+                )
+            )
+        )
+
+
     }
 
 
