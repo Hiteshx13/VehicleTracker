@@ -47,7 +47,7 @@ import com.akexorcist.googledirection.model.Direction
 
 
 class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
-    OnMapReadyCallback {
+    OnMapReadyCallback,GoogleMap.OnMarkerClickListener {
 
     private val TAG = "FragmentMapUserVehicle"
     private lateinit var viewModel: OwnerViewModel
@@ -60,6 +60,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
     private lateinit var currentDeviceLocation: Location
     private var oldVehicleList: List<OwnerResponse.Data.Vehicle>? = null
     private var isUpdating = false
+    private var markerClickID = ""
     private lateinit var mFusedLocationClient: FusedLocationProviderClient
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -67,11 +68,10 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
         ownerData = args.ownerData
         oldVehicleList = ownerData.vehicles
         viewModel = (activity as VehicleTrackerActivity).viewModel
-        setupMap()
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
-        setupLocationCallback()
-        requestLocationPermission()
 
+        setupGoogleMap()
+        setupDeviceLocationCallback()
+        requestLocationPermission()
         setObserver()
         callApiEveryMinute()
 
@@ -123,8 +123,10 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
                             }
 
                         }
-                        zoomOnFirstMarker()
                         updateVehicleDataInDB()
+                        if(!isUpdating){
+                        zoomOnFirstMarker()
+                        }
                         isUpdating = true
 
 
@@ -179,6 +181,20 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
 
         if (isUpdating) {
             val marker = mapMarkers[vehicle.vehicleid.toString()]
+
+            val oldModel: OwnerResponse.Data.Vehicle = marker?.tag as OwnerResponse.Data.Vehicle
+            oldModel.lat = vehicle.lat
+            oldModel.lon = vehicle.lon
+            marker.tag = oldModel
+
+            /** updating current open infoWindow data **/
+            if (markerClickID.isNotEmpty()) {
+                val markerClicked = mapMarkers[markerClickID]
+                if (markerClicked?.isInfoWindowShown == true) {
+                    markerClicked.showInfoWindow()
+                }
+            }
+
             animateMarker(
                 marker!!, LatLng(
                     vehicle.lat!!,
@@ -193,7 +209,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
                     isUpdating
                 )
             )
-
+            googleMap?.setOnMarkerClickListener(this)
             val markerOpt = MarkerOptions().position(
                 LatLng(
                     vehicle.lat!!,
@@ -243,7 +259,8 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
         }
     }
 
-    private fun setupLocationCallback() {
+    private fun setupDeviceLocationCallback() {
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult?) {
                 locationResult ?: return
@@ -338,7 +355,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
         })
     }
 
-    private fun setupMap() {
+    private fun setupGoogleMap() {
         val mapFragment =
             childFragmentManager.findFragmentById(R.id.map) as? SupportMapFragment
         mapFragment?.getMapAsync(this)
@@ -346,5 +363,12 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
 
     override fun onMapReady(map: GoogleMap) {
         googleMap = map
+    }
+
+    /** function for Map Marker click listener**/
+    override fun onMarkerClick(marker: Marker): Boolean {
+        val model: OwnerResponse.Data.Vehicle = marker.tag as OwnerResponse.Data.Vehicle
+        markerClickID = model.vehicleid.toString()
+        return false
     }
 }
