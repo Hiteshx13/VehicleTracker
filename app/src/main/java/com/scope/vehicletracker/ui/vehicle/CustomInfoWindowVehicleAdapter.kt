@@ -17,8 +17,7 @@ import com.squareup.picasso.Callback
 import com.squareup.picasso.Picasso
 
 internal class CustomInfoWindowVehicleAdapter(
-    private var inflater: LayoutInflater,
-    private var isUpdating: Boolean
+    private var inflater: LayoutInflater
 ) :
     InfoWindowAdapter {
 

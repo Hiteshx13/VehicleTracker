@@ -4,18 +4,17 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.location.Location
 import android.os.Bundle
 import android.os.Looper
 import android.util.Log
 import android.view.View
-import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.Observer
 import androidx.navigation.fragment.navArgs
 import com.akexorcist.googledirection.DirectionCallback
 import com.akexorcist.googledirection.GoogleDirection
@@ -25,10 +24,8 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.Marker
-import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.gms.maps.model.*
+import com.google.maps.android.SphericalUtil
 import com.scope.vehicletracker.R
 import com.scope.vehicletracker.network.Resource
 import com.scope.vehicletracker.network.response.owner.OwnerResponse
@@ -36,6 +33,8 @@ import com.scope.vehicletracker.ui.VehicleTrackerActivity
 import com.scope.vehicletracker.ui.owner.OwnerViewModel
 import com.scope.vehicletracker.util.AppUtils
 import com.scope.vehicletracker.util.AppUtils.animateMarker
+import com.scope.vehicletracker.util.AppUtils.checkForInternet
+import com.scope.vehicletracker.util.AppUtils.showToast
 import com.scope.vehicletracker.util.Constants.Companion.VEHICLE_API_DELAY
 import com.scope.vehicletracker.util.LatLngInterpolator
 import com.scope.vehicletracker.util.SettingsDialogClickListener
@@ -62,8 +61,9 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
     private var oldVehicleList: List<OwnerResponse.Data.Vehicle>? = null
     private var isUpdatingVehicleLocation = false
     private var markerClickID = ""
-    private var requestPermissionLauncher : ActivityResultLauncher<Array<String>>?= null
+    private var requestPermissionLauncher: ActivityResultLauncher<Array<String>>? = null
     private lateinit var mFusedLocationClient: FusedLocationProviderClient
+    private var polylineNearesrtVehicle: Polyline? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -108,8 +108,12 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
 
     private fun callApiEveryMinute() {
         job = CoroutineScope(Main).launch {
-            viewModel.getVehicleDataFromAPI(ownerData.userid.toString())
-            Log.d("callApiEveryMinute", "call")
+            if (checkForInternet(requireContext())) {
+                viewModel.getVehicleDataFromAPI(ownerData.userid.toString())
+            } else {
+                requireContext().showToast(getString(R.string.please_check_device_internet_connection))
+            }
+
             delay(VEHICLE_API_DELAY)
             callApiEveryMinute()
         }
@@ -132,7 +136,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
     }
 
     private fun setObserver() {
-        viewModel.vehicleResponseAPI.observe(viewLifecycleOwner, Observer { response ->
+        viewModel.vehicleResponseAPI.observe(viewLifecycleOwner, { response ->
 
             when (response) {
                 is Resource.Success -> {
@@ -165,8 +169,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
                 is Resource.Error -> {
                     hideProgressBar()
                     response.message?.let { message ->
-                        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
-                        Log.d(TAG, "Error occured: $message ")
+                        requireContext().showToast(message)
                     }
                 }
                 is Resource.Loading -> {
@@ -207,11 +210,9 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
         progressBarMap.visibility = View.VISIBLE
     }
 
+    @SuppressLint("PotentialBehaviorOverride")
     private fun showOwnerVehicleOnMap(vehicle: OwnerResponse.Data.Vehicle) {
-        val marker = mapMarkers[vehicle.vehicleid.toString()]
-        if (marker != null) {
-
-        }
+        var marker = mapMarkers[vehicle.vehicleid.toString()]
 
         if (isUpdatingVehicleLocation) {
 
@@ -220,7 +221,6 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
                 oldModel.lat = vehicle.lat
                 oldModel.lon = vehicle.lon
                 marker.tag = oldModel
-
 
                 /** updating current open infoWindow data **/
                 if (markerClickID.isNotEmpty()) {
@@ -236,15 +236,10 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
                         vehicle.lon!!
                     ), LatLngInterpolator.Spherical()
                 )
+                showNearestVehiclePolyLine()
             }
         } else {
-            val marker: Marker?
-            googleMap?.setInfoWindowAdapter(
-                CustomInfoWindowVehicleAdapter(
-                    layoutInflater,
-                    isUpdatingVehicleLocation
-                )
-            )
+            googleMap?.setInfoWindowAdapter(CustomInfoWindowVehicleAdapter(layoutInflater))
             googleMap?.setOnMarkerClickListener(this)
             val markerOpt = MarkerOptions().position(
                 LatLng(
@@ -264,7 +259,6 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
                 )
             )
             mapMarkers[vehicle.vehicleid.toString()] = marker
-//            markerList.add()
         }
     }
 
@@ -275,13 +269,10 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
 
     /** zoom on first marker*/
     private fun zoomOnFirstMarker() {
-//        Log.d("old",""+Pld)
         if (!oldVehicleList.isNullOrEmpty()) {
             val firstVehicle = oldVehicleList!![0]
 
             if (firstVehicle.lat != null && firstVehicle.lon != null) {
-
-
                 val zoomLatLan = LatLng(
                     firstVehicle.lat!!,
                     firstVehicle.lon!!
@@ -303,6 +294,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
                 for (location in locationResult.locations) {
                     Log.d("Location Update", "${location.latitude} ${location.longitude}")
                     currentDeviceLocation = location
+                    showNearestVehiclePolyLine()
                 }
             }
         }
@@ -343,9 +335,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
                 activity!!,
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) -> {
-                // Message
                 showSettingsDialog()
-//                Toast.makeText(requireContext(),"Enable Location",Toast.LENGTH_LONG).show()
             }
             else -> {
                 requestPermissionLauncher?.launch(
@@ -360,6 +350,39 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
 
     }
 
+
+    fun showNearestVehiclePolyLine() {
+
+        /** finding shortest distance for available vehicle form current device location**/
+        var nearestVehicle: OwnerResponse.Data.Vehicle? = null
+        var distanceOld = 0.0
+
+        oldVehicleList?.forEach {
+            nearestVehicle = it
+            val distance = SphericalUtil.computeDistanceBetween(
+                LatLng(currentDeviceLocation.latitude, currentDeviceLocation.longitude),
+                LatLng(it.lat!!, it.lon!!)
+            )
+            if (distance > distanceOld) {
+                distanceOld = distance
+                nearestVehicle = it
+            }
+        }
+
+        /** remove old polyline and add new polyline with
+         * updated position of vehicle **/
+        polylineNearesrtVehicle?.remove()
+        polylineNearesrtVehicle = googleMap?.addPolyline(
+            PolylineOptions()
+                .clickable(true)
+                .color(Color.BLUE)
+                .add(
+                    LatLng(currentDeviceLocation.latitude, currentDeviceLocation.longitude),
+                    LatLng(nearestVehicle?.lat!!, nearestVehicle?.lon!!)
+
+                )
+        )
+    }
 
     /**
      * show dialog to grant location  permission from application settings
