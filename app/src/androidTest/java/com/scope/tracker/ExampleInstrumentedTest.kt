@@ -1,4 +1,4 @@
-package com.scope.vehicletracker
+package com.scope.tracker
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
