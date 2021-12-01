@@ -22,7 +22,7 @@
             android:layout_width="@dimen/_50sdp"
             android:layout_height="@dimen/_50sdp"
             android:layout_marginStart="@dimen/_10sdp"
-            android:src="@mipmap/ic_launcher" />
+            tools:src="@mipmap/ic_launcher" />
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/tvOwnerName"
@@ -33,7 +33,7 @@
             android:textColor="@drawable/color_selector_blue_white"
             android:textSize="@dimen/_18ssp"
             android:maxLines="2"
-            android:text="Jack Sparrow Jack Sparrow Jack Sparrow  Jack Sparrow" />
+            tools:text="Jack Sparrow Jack Sparrow Jack Sparrow  Jack Sparrow" />
     </LinearLayout>
 
     <View
