@@ -351,7 +351,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
             /** finding shortest distance for available vehicle form current device location**/
             var nearestVehicle: OwnerResponse.Data.Vehicle? = null
 
-            var shortestDistance = 50000000000000000.0f
+            var shortestDistance = 0.0f
 
             val locationDevice = Location(currentDeviceLocation)
             val locationVehicle = Location("vehicle")
@@ -363,7 +363,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
 
                     val distance = calculateDistance(locationDevice, locationVehicle)
 
-                    if (distance < shortestDistance) {
+                    if (shortestDistance ==0 || distance < shortestDistance) {
                         shortestDistance = distance
                         nearestVehicle = it
                     }
