@@ -363,7 +363,7 @@ class FragmentMapUserVehicle : Fragment(R.layout.fragment_map_user_vehicle),
 
                     val distance = calculateDistance(locationDevice, locationVehicle)
 
-                    if (shortestDistance ==0.0 || distance < shortestDistance) {
+                    if (shortestDistance == 0.0f || distance < shortestDistance) {
                         shortestDistance = distance
                         nearestVehicle = it
                     }
